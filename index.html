@@ -1,11 +1,9 @@
-<!-- 統合版：DFS / Kruskal / Prim の迷路ジェネレーター 切り替え式 -->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>統合版迷路ジェネレーター</title>
-  <link rel="icon" href="favicon.png" type="image/png">
   <style>
     body {
       background-color: #f0f0f0;
@@ -65,35 +63,32 @@
         font-size: 20px;
         padding: 14px 24px;
       }
-
       input[type="range"] {
         width: 100%;
         height: 12px;
       }
-
       input[type="range"]::-webkit-slider-thumb {
         width: 28px;
         height: 28px;
         margin-top: -8px;
       }
-
       #controls {
         padding: 0 10px;
       }
     }
-
   </style>
 </head>
 <body>
-  <h2>迷路ジェネレーター（DFS / Kruskal / Prim）</h2>
+  <h2>迷路ジェネレーター（DFS / Kruskal / Prim / Wilson）</h2>
   <div id="controls">
     <div class="control-row">
       <label for="sizeSlider">サイズ: <span id="sizeLabel">21</span></label>
-      <input type="range" id="sizeSlider" min="5" max="101" step="2" value="21" onchange="updateSize()">
+      <input type="range" id="sizeSlider" min="5" max="101" step="2" value="21" onchange="updateSize()" />
       <select id="algoSelector" onchange="generateMaze()">
         <option value="dfs">DFS法</option>
-        <option value="prim">prim法</option>
+        <option value="prim">Prim法</option>
         <option value="kruskal">Kruskal法</option>
+        <option value="wilson">Wilson法</option>
       </select>
     </div>
     <div class="control-row">
@@ -129,7 +124,7 @@
     }
 
     function updateCanvasSize() {
-      const isMobile = window.innerWidth < 600; // 600px以下ならスマホとみなす
+      const isMobile = window.innerWidth < 600;
       const maxCanvasWidth = window.innerWidth - 40;
       const maxCanvasHeight = window.innerHeight - 200;
 
@@ -138,14 +133,11 @@
       const calculatedCellSize = Math.min(maxCellWidth, maxCellHeight);
 
       if (isMobile) {
-        // スマホなら小さめ
         cellSize = Math.max(4, Math.min(20, calculatedCellSize));
       } else {
-        // PCなら大きめ
         cellSize = Math.max(6, Math.min(40, calculatedCellSize));
       }
     }
-
 
     function drawMaze() {
       canvas.width = size * cellSize;
@@ -182,12 +174,13 @@
       if (algo === 'dfs') generateMazeDFS();
       else if (algo === 'kruskal') generateMazeKruskal();
       else if (algo === 'prim') generateMazePrim();
+      else if (algo === 'wilson') generateMazeWilson();
       showSolutionFlag = false;
       solutionPath = [];
       drawMaze();
     }
 
-    // 各アルゴリズムの実装（ここにDFS, Kruskal, Primを追加）
+    // --- DFS ---
     function generateMazeDFS() {
       const stack = [[1, 1]];
       maze[1][1] = 0;
@@ -203,7 +196,7 @@
         }
         if (neighbors.length) {
           const [nx, ny] = neighbors[Math.floor(Math.random() * neighbors.length)];
-          maze[(y + ny) / 2][(x + nx) / 2] = 0;
+          maze[(y + ny) >> 1][(x + nx) >> 1] = 0;
           maze[ny][nx] = 0;
           stack.push([nx, ny]);
         } else {
@@ -212,26 +205,24 @@
       }
     }
 
+    // --- Kruskal ---
     function generateMazeKruskal() {
-      //Kruskal法
-      initMaze(); // 全部壁にする
+      initMaze();
 
       const id = (x, y) => (y >> 1) * ((size - 1) >> 1) + (x >> 1);
       const parent = Array(((size - 1) >> 1) * ((size - 1) >> 1)).fill(0).map((_, i) => i);
       const find = i => parent[i] === i ? i : parent[i] = find(parent[i]);
       const unite = (i, j) => { parent[find(i)] = find(j); };
 
-      // 壁候補を集める
       let walls = [];
       for (let y = 1; y < size - 1; y += 2) {
         for (let x = 1; x < size - 1; x += 2) {
           maze[y][x] = 0;
-          if (x + 2 < size) walls.push([x, y, x + 2, y]);     // 横
-          if (y + 2 < size) walls.push([x, y, x, y + 2]);     // 縦
+          if (x + 2 < size) walls.push([x, y, x + 2, y]);
+          if (y + 2 < size) walls.push([x, y, x, y + 2]);
         }
       }
 
-      // 壁をランダムに壊す
       for (let i = walls.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [walls[i], walls[j]] = [walls[j], walls[i]];
@@ -247,10 +238,9 @@
       }
     }
 
-
+    // --- Prim ---
     function generateMazePrim() {
-      // Prim法
-      initMaze(); // 全部壁にする
+      initMaze();
 
       const inMaze = Array.from({ length: size }, () => Array(size).fill(false));
       const frontier = [];
@@ -266,89 +256,144 @@
         }
       }
 
-  // スタート地点
-  maze[1][1] = 0;
-  inMaze[1][1] = true;
-  addFrontiers(1, 1);
+      maze[1][1] = 0;
+      inMaze[1][1] = true;
+      addFrontiers(1, 1);
 
-  while (frontier.length > 0) {
-    const index = Math.floor(Math.random() * frontier.length);
-    const [x, y, px, py] = frontier.splice(index, 1)[0];
+      while (frontier.length > 0) {
+        const index = Math.floor(Math.random() * frontier.length);
+        const [x, y, px, py] = frontier.splice(index, 1)[0];
 
-    if (maze[y][x] === 1) {
-      maze[y][x] = 0;
-      maze[(y + py) / 2][(x + px) / 2] = 0;
-      addFrontiers(x, y);
-    }
-  }
-}
-
-    function solveMaze() {
-      const visited = Array.from({ length: size }, () => Array(size).fill(false));
-      solutionPath = [];
-      function dfs(x, y) {
-        if (x === size - 2 && y === size - 2) {
-          solutionPath.push([x, y]);
-          return true;
+        if (maze[y][x] === 1) {
+          maze[y][x] = 0;
+          maze[(y + py) >> 1][(x + px) >> 1] = 0;
+          addFrontiers(x, y);
         }
-        visited[y][x] = true;
-        const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-        for (const [dx, dy] of dirs) {
+      }
+    }
+
+    // --- Wilson ---
+    function generateMazeWilson() {
+      initMaze();
+
+      maze[1][1] = 0;
+
+      let unvisited = [];
+      for (let y = 1; y < size; y += 2) {
+        for (let x = 1; x < size; x += 2) {
+          if (!(x === 1 && y === 1)) unvisited.push([x, y]);
+        }
+      }
+
+      function neighbors(x, y) {
+        const dirs = [[0, -2], [2, 0], [0, 2], [-2, 0]];
+        return dirs
+          .map(([dx, dy]) => [x + dx, y + dy])
+          .filter(([nx, ny]) => nx > 0 && nx < size - 1 && ny > 0 && ny < size - 1);
+      }
+
+      while (unvisited.length > 0) {
+        let idx = Math.floor(Math.random() * unvisited.length);
+        let [cx, cy] = unvisited[idx];
+
+        let path = [[cx, cy]];
+        let pathMap = new Map();
+        pathMap.set(`${cx},${cy}`, 0);
+
+        while (maze[cy][cx] === 1) {
+          const nbs = neighbors(cx, cy);
+          let [nx, ny] = nbs[Math.floor(Math.random() * nbs.length)];
+
+          if (pathMap.has(`${nx},${ny}`)) {
+            const loopStart = pathMap.get(`${nx},${ny}`);
+            path = path.slice(0, loopStart + 1);
+            pathMap = new Map(path.map((p, i) => [`${p[0]},${p[1]}`, i]));
+          } else {
+            path.push([nx, ny]);
+            pathMap.set(`${nx},${ny}`, path.length - 1);
+          }
+          cx = nx;
+          cy = ny;
+        }
+
+        for (let i = 0; i < path.length - 1; i++) {
+          const [x1, y1] = path[i];
+          const [x2, y2] = path[i + 1];
+          maze[y1][x1] = 0;
+          maze[(y1 + y2) >> 1][(x1 + x2) >> 1] = 0;
+          unvisited = unvisited.filter(([ux, uy]) => !(ux === x1 && uy === y1));
+        }
+        unvisited = unvisited.filter(([ux, uy]) => !(ux === cx && uy === cy));
+      }
+    }
+
+    // --- 迷路解答 BFS ---
+    function solveMaze() {
+      const start = [1, 1];
+      const goal = [size - 2, size - 2];
+      const queue = [start];
+      const cameFrom = Array.from({ length: size }, () => Array(size).fill(null));
+      cameFrom[start[1]][start[0]] = start;
+
+      while (queue.length) {
+        const [x, y] = queue.shift();
+        if (x === goal[0] && y === goal[1]) break;
+        const moves = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+        for (const [dx, dy] of moves) {
           const nx = x + dx, ny = y + dy;
-          if (nx >= 0 && nx < size && ny >= 0 && ny < size && maze[ny][nx] === 0 && !visited[ny][nx]) {
-            if (dfs(nx, ny)) {
-              solutionPath.push([x, y]);
-              return true;
-            }
+          if (nx >= 0 && nx < size && ny >= 0 && ny < size && maze[ny][nx] === 0 && !cameFrom[ny][nx]) {
+            cameFrom[ny][nx] = [x, y];
+            queue.push([nx, ny]);
           }
         }
-        return false;
       }
-      dfs(1, 1);
-      solutionPath.reverse();
+
+      let path = [];
+      let current = goal;
+      while (current[0] !== start[0] || current[1] !== start[1]) {
+        path.push(current);
+        current = cameFrom[current[1]][current[0]];
+        if (!current) return []; // 解なし
+      }
+      path.push(start);
+      path.reverse();
+      solutionPath = path;
+      return path;
     }
 
-    function solveAndDownload() {
-      solveMaze();
-      showSolutionFlag = true;
-      drawMaze();
-      setTimeout(() => {
-        const link = document.createElement('a');
-        link.download = 'maze_answer.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      }, 100);
-    }
-
+    // --- 表示切替 ---
     function showSolution() {
-      solveMaze();
+      if (solutionPath.length === 0) solveMaze();
       showSolutionFlag = true;
       drawMaze();
     }
-
     function hideSolution() {
       showSolutionFlag = false;
       drawMaze();
     }
 
+    // --- 保存 ---
     function downloadMaze() {
-      showSolutionFlag = false;
-      drawMaze();
-      setTimeout(() => {
-        const link = document.createElement('a');
-        link.download = 'maze.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      }, 100);
+      const link = document.createElement('a');
+      link.download = `maze_${algoSelector.value}_${size}.txt`;
+      link.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(maze.map(row => row.map(c => (c ? '1' : '0')).join('')).join('\n'));
+      link.click();
     }
 
-    window.addEventListener('resize', () => {
+    function solveAndDownload() {
+      solveMaze();
+      const link = document.createElement('a');
+      link.download = `solution_${algoSelector.value}_${size}.txt`;
+      link.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(solutionPath.map(([x,y]) => `${x},${y}`).join('\n'));
+      link.click();
+    }
+
+    window.addEventListener("resize", () => {
       updateCanvasSize();
       drawMaze();
     });
 
-
-    window.onload = () => generateMaze();
+    generateMaze();
   </script>
 </body>
 </html>
