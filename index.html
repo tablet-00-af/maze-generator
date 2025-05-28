@@ -98,7 +98,7 @@
       <button onclick="solveAndDownload()">回答を保存</button>
       <button onclick="showSolution()">回答を表示</button>
       <button onclick="hideSolution()">回答を隠す</button>
-      <button onclick="startAnimatedGeneration()">迷路が生成される様子を見る</button>
+      <button onclick="startAnimatedGeneration()">迷路が生成される様子を見る(サイズ50以下がおすすめ)</button>
     </div>
   </div>
   <canvas id="mazeCanvas"></canvas>
@@ -189,6 +189,10 @@
       controls.forEach(el => el.disabled = disabled);
     }
 
+    function getAnimationDelay(size) {
+      const maxTotalTime = 10000; // 最大10秒
+      const delay = maxTotalTime / size;
+    }
 
     // --- DFS ---
     function generateMazeDFS() {
